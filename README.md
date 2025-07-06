@@ -3,6 +3,7 @@
 This project provides a web-based interface for managing cryptographic keys, Certificate Signing Requests (CSRs), Certificate Authorities (CAs), and certificates. It allows for key generation, CSR creation, CA management, and certificate signing, including a simplified "one-stop" process for generating and signing certificates.
 
 ## Table of Contents
+- [User Manual and Cryptography Guide](USER_MANUAL.md)
 - [Features](#features)
 - [Running Locally (PC)](#running-locally-pc)
 - [Running with Docker](#running-with-docker)
