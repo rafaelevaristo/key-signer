@@ -103,6 +103,7 @@ def generate_key():
         data = request.get_json()
         purpose = data.get('purpose', 'server_auth')
         key_size = int(data.get('key_size', 2048))
+        name = data.get('name', f"{purpose} Key") # New: Get name from request, default to purpose
         
         # Generate private key
         private_key = rsa.generate_private_key(
@@ -141,6 +142,7 @@ def generate_key():
         keys_db = load_json_db(KEYS_DB)
         keys_db[key_id] = {
             'id': key_id,
+            'name': name, # New: Store the name
             'purpose': purpose,
             'key_size': key_size,
             'created_at': datetime.now().isoformat(),
@@ -152,6 +154,7 @@ def generate_key():
         return jsonify({
             'success': True,
             'key_id': key_id,
+            'name': name, # New: Return the name
             'purpose': purpose,
             'key_size': key_size,
             'created_at': keys_db[key_id]['created_at']

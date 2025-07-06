@@ -144,6 +144,10 @@
                                     <option value="4096">4096 bits</option>
                                 </select>
                             </div>
+                            <div class="form-group">
+                                <label class="form-label">Key Name (Optional)</label>
+                                <input type="text" id="key-name" class="form-input" placeholder="e.g., My Server Key">
+                            </div>
                             <button type="submit" class="btn btn-primary">Generate Key Pair</button>
                         </form>
                         <div id="key-result" class="mt-4"></div>
@@ -393,12 +397,13 @@
             
             const purpose = document.getElementById('key-purpose').value;
             const keySize = document.getElementById('key-size').value;
+            const keyName = document.getElementById('key-name').value;
             
             try {
                 const response = await fetch(`${API_BASE}/generate-key`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ purpose, key_size: keySize })
+                    body: JSON.stringify({ purpose, key_size: keySize, name: keyName })
                 });
                 
                 const result = await response.json();
@@ -432,6 +437,7 @@
                     <table class="table">
                         <thead>
                             <tr>
+                                <th>Name</th>
                                 <th>Purpose</th>
                                 <th>Key Size</th>
                                 <th>Created</th>
@@ -441,6 +447,7 @@
                         <tbody>
                             ${keys.map(key => `
                                 <tr>
+                                    <td>${key.name || 'N/A'}</td>
                                     <td>${key.purpose}</td>
                                     <td>${key.key_size} bits</td>
                                     <td>${formatDate(key.created_at)}</td>
@@ -456,7 +463,7 @@
                 
                 // Update CSR key dropdown
                 csrKeySelect.innerHTML = '<option value="">Select a key...</option>' + 
-                    keys.map(key => `<option value="${key.id}">${key.purpose} (${key.key_size} bits)</option>`).join('');
+                    keys.map(key => `<option value="${key.id}">${key.name || key.purpose} (${key.key_size} bits)</option>`).join('');
                 
             } catch (error) {
                 console.error('Error loading keys:', error);
