@@ -378,6 +378,15 @@
             document.body.removeChild(a);
         }
 
+        function downloadPFX(certId) {
+            const password = prompt("Enter a password for the PFX file (optional):");
+            let url = `${API_BASE}/download/pfx/${certId}`;
+            if (password) {
+                url += `?password=${encodeURIComponent(password)}`;
+            }
+            downloadFile(url, `cert_${certId}.pfx`);
+        }
+
         // Key management
         document.getElementById('key-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -699,6 +708,7 @@
                                     <td>${formatDate(cert.not_valid_after)}</td>
                                     <td>
                                         <button onclick="downloadFile('${API_BASE}/download/certificate/${cert.id}', 'cert_${cert.id}.pem')" class="btn btn-sm btn-success">Download Certificate</button>
+                                        <button onclick="downloadPFX('${cert.id}')" class="btn btn-sm btn-success ml-2">Download PFX</button>
                                     </td>
                                 </tr>
                             `).join('')}

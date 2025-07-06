@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timedelta
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.hazmat.primitives.serialization import pkcs12, BestAvailableEncryption
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtensionOID
 import tempfile
@@ -548,6 +548,60 @@ def download_csr(csr_id):
 @app.route('/')
 def serve_index():
     return send_file('index.html')
+
+@app.route('/api/download/pfx/<cert_id>', methods=['GET'])
+def download_pfx(cert_id):
+    """Download certificate and private key as PFX/P12"""
+    try:
+        certs_db = load_json_db(CERTS_DB)
+        if cert_id not in certs_db:
+            return jsonify({'error': 'Certificate not found'}), 404
+        
+        cert_info = certs_db[cert_id]
+        
+        # Load certificate
+        with open(cert_info['cert_file'], 'rb') as f:
+            certificate = x509.load_pem_x509_certificate(f.read())
+        
+        # Find associated private key
+        csrs_db = load_json_db(CSRS_DB)
+        csr_id = cert_info['csr_id']
+        if csr_id not in csrs_db:
+            return jsonify({'error': 'Associated CSR not found'}), 404
+        
+        csr_info = csrs_db[csr_id]
+        key_id = csr_info['key_id']
+        
+        keys_db = load_json_db(KEYS_DB)
+        if key_id not in keys_db:
+            return jsonify({'error': 'Associated key not found'}), 404
+        
+        key_info = keys_db[key_id]
+        with open(key_info['private_key_file'], 'rb') as f:
+            private_key = serialization.load_pem_private_key(f.read(), password=None)
+        
+        # Get password from query parameter (optional)
+        password = request.args.get('password')
+        if password:
+            encryption_algorithm = BestAvailableEncryption(password.encode('utf-8'))
+        else:
+            encryption_algorithm = serialization.NoEncryption()
+
+        # Serialize to PFX
+        pfx_bytes = pkcs12.serialize_key_and_certificates(
+            name=certificate.subject.rfc4514_string().encode('utf-8'),
+            key=private_key,
+            cert=certificate,
+            cas=None, # No CA chain for now
+            encryption_algorithm=encryption_algorithm
+        )
+        
+        return send_file(BytesIO(pfx_bytes), as_attachment=True,
+                       download_name=f"cert_{cert_id}.pfx",
+                       mimetype='application/x-pkcs12')
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
