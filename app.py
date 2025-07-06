@@ -197,6 +197,8 @@ def create_csr():
             subject_components.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, subject_data['organizational_unit']))
         if subject_data.get('common_name'):
             subject_components.append(x509.NameAttribute(NameOID.COMMON_NAME, subject_data['common_name']))
+        if subject_data.get('email'):
+            subject_components.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, subject_data['email']))
         
         subject = x509.Name(subject_components)
         
@@ -206,6 +208,13 @@ def create_csr():
         # Add key usage extension
         key_usage = get_key_usage_extension(key_info['purpose'])
         csr = csr.add_extension(key_usage, critical=True)
+
+        # Add Subject Alternative Name for S/MIME
+        if key_info['purpose'] == "smime" and subject_data.get('email'):
+            csr = csr.add_extension(
+                x509.SubjectAlternativeName([x509.RFC822Name(subject_data['email'])]),
+                critical=False,
+            )
         
         # Sign CSR
         csr = csr.sign(private_key, hashes.SHA256())
@@ -276,6 +285,8 @@ def create_ca():
             subject_components.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, subject_data['organizational_unit']))
         if subject_data.get('common_name'):
             subject_components.append(x509.NameAttribute(NameOID.COMMON_NAME, subject_data['common_name']))
+        if subject_data.get('email'):
+            subject_components.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, subject_data['email']))
         
         subject = x509.Name(subject_components)
         
@@ -293,15 +304,25 @@ def create_ca():
         ).not_valid_after(
             datetime.utcnow() + timedelta(days=validity_days)
         ).add_extension(
-            x509.SubjectAlternativeName([]),
-            critical=False,
-        ).add_extension(
             x509.BasicConstraints(ca=True, path_length=None),
             critical=True,
         ).add_extension(
             get_key_usage_extension('ca'),
             critical=True,
-        ).sign(ca_private_key, hashes.SHA256())
+        )
+        
+        if subject_data.get('email'):
+            ca_cert = ca_cert.add_extension(
+                x509.SubjectAlternativeName([x509.RFC822Name(subject_data['email'])]),
+                critical=False,
+            )
+        else:
+            ca_cert = ca_cert.add_extension(
+                x509.SubjectAlternativeName([]),
+                critical=False,
+            )
+        
+        ca_cert = ca_cert.sign(ca_private_key, hashes.SHA256())
         
         # Generate CA ID
         ca_id = str(uuid.uuid4())

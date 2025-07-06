@@ -197,6 +197,10 @@
                                 <label class="form-label">City/Locality (L)</label>
                                 <input type="text" id="csr-city" class="form-input" placeholder="San Francisco">
                             </div>
+                            <div class="form-group">
+                                <label class="form-label">Email (for S/MIME)</label>
+                                <input type="email" id="csr-email" class="form-input" placeholder="user@example.com">
+                            </div>
                             <button type="submit" class="btn btn-primary">Create CSR</button>
                         </form>
                         <div id="csr-result" class="mt-4"></div>
@@ -270,6 +274,10 @@
                             <div class="form-group">
                                 <label class="form-label">City/Locality (L)</label>
                                 <input type="text" id="ca-city" class="form-input" placeholder="San Francisco">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Email (Optional)</label>
+                                <input type="email" id="ca-email" class="form-input" placeholder="ca@example.com">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Validity (Days)</label>
@@ -457,7 +465,8 @@
                 organizational_unit: document.getElementById('csr-ou').value,
                 country: document.getElementById('csr-country').value,
                 state: document.getElementById('csr-state').value,
-                city: document.getElementById('csr-city').value
+                city: document.getElementById('csr-city').value,
+                email: document.getElementById('csr-email').value
             };
             
             if (!keyId) {
@@ -545,7 +554,8 @@
                 organizational_unit: document.getElementById('ca-ou').value,
                 country: document.getElementById('ca-country').value,
                 state: document.getElementById('ca-state').value,
-                city: document.getElementById('ca-city').value
+                city: document.getElementById('ca-city').value,
+                email: document.getElementById('ca-email').value
             };
             
             const validityDays = document.getElementById('ca-validity').value;
