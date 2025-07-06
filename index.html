@@ -119,6 +119,7 @@
                 <button class="tab-button" onclick="showTab('csrs')">📋 Certificate Requests</button>
                 <button class="tab-button" onclick="showTab('cas')">🏢 Certificate Authorities</button>
                 <button class="tab-button" onclick="showTab('certificates')">📜 Certificates</button>
+                <button class="tab-button" onclick="showTab('onestop')">🚀 One-Stop Cert</button>
             </div>
 
             <!-- Key Management Tab -->
@@ -321,11 +322,88 @@
                     <button onclick="loadCertificates()" class="btn btn-secondary btn-sm mt-4">Refresh</button>
                 </div>
             </div>
+
+            <!-- One-Stop Cert Tab -->
+            <div id="onestop-tab" class="tab-content hidden">
+                <div class="card">
+                    <h2 class="text-lg font-semibold mb-4">Generate & Sign Certificate (One-Stop)</h2>
+                    <form id="onestop-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Key Purpose</label>
+                                <select id="onestop-key-purpose" class="form-input">
+                                    <option value="server_auth">Server Authentication (HTTPS/TLS)</option>
+                                    <option value="client_auth">Client Authentication (mTLS)</option>
+                                    <option value="smime">S/MIME (Email)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Key Size</label>
+                                <select id="onestop-key-size" class="form-input">
+                                    <option value="2048">2048 bits</option>
+                                    <option value="3072">3072 bits</option>
+                                    <option value="4096">4096 bits</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Key Name (Optional)</label>
+                            <input type="text" id="onestop-key-name" class="form-input" placeholder="e.g., My New Server Cert">
+                        </div>
+                        <h3 class="text-md font-semibold mt-6 mb-3">Subject Details</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Common Name (CN)</label>
+                                <input type="text" id="onestop-cn" class="form-input" placeholder="example.com">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Organization (O)</label>
+                                <input type="text" id="onestop-org" class="form-input" placeholder="My Company">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Organizational Unit (OU)</label>
+                                <input type="text" id="onestop-ou" class="form-input" placeholder="IT Department">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Country (C)</label>
+                                <input type="text" id="onestop-country" class="form-input" maxlength="2" placeholder="US">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">State/Province (ST)</label>
+                                <input type="text" id="onestop-state" class="form-input" placeholder="California">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">City/Locality (L)</label>
+                                <input type="text" id="onestop-city" class="form-input" placeholder="San Francisco">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Email (for S/MIME)</label>
+                                <input type="email" id="onestop-email" class="form-input" placeholder="user@example.com">
+                            </div>
+                        </div>
+                        <h3 class="text-md font-semibold mt-6 mb-3">Signing Details</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Select CA</label>
+                                <select id="onestop-ca" class="form-input">
+                                    <option value="">Select a CA...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Validity (Days)</label>
+                                <input type="number" id="onestop-validity" class="form-input" value="365">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-4">Generate & Sign Certificate</button>
+                    </form>
+                    <div id="onestop-result" class="mt-4"></div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:5000/api';
+        const API_BASE = window.location.origin + '/api';
 
         // Tab management
         function showTab(tabName) {
@@ -358,6 +436,9 @@
                     break;
                 case 'certificates':
                     loadCertificates();
+                    break;
+                case 'onestop':
+                    loadCAs(); // For CA selection dropdown
                     break;
             }
         }
@@ -641,6 +722,11 @@
                 // Update sign CA dropdown
                 signCaSelect.innerHTML = '<option value="">Select a CA...</option>' + 
                     cas.map(ca => `<option value="${ca.id}">${ca.subject.common_name || 'Unnamed CA'}</option>`).join('');
+
+                // Update onestop CA dropdown
+                const onestopCaSelect = document.getElementById('onestop-ca');
+                onestopCaSelect.innerHTML = '<option value="">Select a CA...</option>' + 
+                    cas.map(ca => `<option value="${ca.id}">${ca.subject.common_name || 'Unnamed CA'}</option>`).join('');
                 
             } catch (error) {
                 console.error('Error loading CAs:', error);
@@ -732,6 +818,61 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Load initial data
             loadKeys();
+        });
+
+        // One-Stop Cert form submission
+        document.getElementById('onestop-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const keyPurpose = document.getElementById('onestop-key-purpose').value;
+            const keySize = document.getElementById('onestop-key-size').value;
+            const keyName = document.getElementById('onestop-key-name').value;
+            const caId = document.getElementById('onestop-ca').value;
+            const validityDays = document.getElementById('onestop-validity').value;
+
+            const subject = {
+                common_name: document.getElementById('onestop-cn').value,
+                organization: document.getElementById('onestop-org').value,
+                organizational_unit: document.getElementById('onestop-ou').value,
+                country: document.getElementById('onestop-country').value,
+                state: document.getElementById('onestop-state').value,
+                city: document.getElementById('onestop-city').value,
+                email: document.getElementById('onestop-email').value
+            };
+
+            if (!caId) {
+                showResult('onestop-result', 'Please select a CA', false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/onestop-cert`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        key_purpose: keyPurpose,
+                        key_size: keySize,
+                        key_name: keyName,
+                        subject: subject,
+                        ca_id: caId,
+                        validity_days: validityDays
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showResult('onestop-result', `Certificate generated and signed successfully! Cert ID: ${result.cert_id}`);
+                    loadKeys();
+                    loadCSRs();
+                    loadCertificates();
+                    document.getElementById('onestop-form').reset();
+                } else {
+                    showResult('onestop-result', `Error: ${result.error}`, false);
+                }
+            } catch (error) {
+                showResult('onestop-result', `Error: ${error.message}`, false);
+            }
         });
     </script>
 </body>

@@ -606,5 +606,159 @@ def download_pfx(cert_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/onestop-cert', methods=['POST'])
+def onestop_cert():
+    """Generate key, create CSR, and sign certificate in one go"""
+    try:
+        data = request.get_json()
+        
+        # Key Generation Parameters
+        key_purpose = data.get('key_purpose', 'server_auth')
+        key_size = int(data.get('key_size', 2048))
+        key_name = data.get('key_name', f"{key_purpose} Key")
+
+        # Subject Data for CSR
+        subject_data = data.get('subject', {})
+
+        # CA and Validity for Signing
+        ca_id = data.get('ca_id')
+        validity_days = int(data.get('validity_days', 365))
+
+        # 1. Generate Key Pair
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=key_size,
+        )
+        key_id = str(uuid.uuid4())
+        private_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        public_key = private_key.public_key()
+        public_pem = public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        private_key_file = os.path.join(KEYS_DIR, f"{key_id}_private.pem")
+        public_key_file = os.path.join(KEYS_DIR, f"{key_id}_public.pem")
+        with open(private_key_file, 'wb') as f:
+            f.write(private_pem)
+        with open(public_key_file, 'wb') as f:
+            f.write(public_pem)
+        keys_db = load_json_db(KEYS_DB)
+        keys_db[key_id] = {
+            'id': key_id,
+            'name': key_name,
+            'purpose': key_purpose,
+            'key_size': key_size,
+            'created_at': datetime.now().isoformat(),
+            'private_key_file': private_key_file,
+            'public_key_file': public_key_file
+        }
+        save_json_db(KEYS_DB, keys_db)
+
+        # 2. Create CSR
+        subject_components = []
+        if subject_data.get('country'):
+            subject_components.append(x509.NameAttribute(NameOID.COUNTRY_NAME, subject_data['country']))
+        if subject_data.get('state'):
+            subject_components.append(x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, subject_data['state']))
+        if subject_data.get('city'):
+            subject_components.append(x509.NameAttribute(NameOID.LOCALITY_NAME, subject_data['city']))
+        if subject_data.get('organization'):
+            subject_components.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, subject_data['organization']))
+        if subject_data.get('organizational_unit'):
+            subject_components.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, subject_data['organizational_unit']))
+        if subject_data.get('common_name'):
+            subject_components.append(x509.NameAttribute(NameOID.COMMON_NAME, subject_data['common_name']))
+        if subject_data.get('email'):
+            subject_components.append(x509.NameAttribute(NameOID.EMAIL_ADDRESS, subject_data['email']))
+        
+        subject = x509.Name(subject_components)
+        csr_builder = x509.CertificateSigningRequestBuilder().subject_name(subject)
+        key_usage = get_key_usage_extension(key_purpose)
+        csr_builder = csr_builder.add_extension(key_usage, critical=True)
+        if key_purpose == "smime" and subject_data.get('email'):
+            csr_builder = csr_builder.add_extension(
+                x509.SubjectAlternativeName([x509.RFC822Name(subject_data['email'])]), 
+                critical=False,
+            )
+        csr = csr_builder.sign(private_key, hashes.SHA256())
+        csr_id = str(uuid.uuid4())
+        csr_file = os.path.join(CSRS_DIR, f"{csr_id}.csr")
+        with open(csr_file, 'wb') as f:
+            f.write(csr.public_bytes(serialization.Encoding.PEM))
+        csrs_db = load_json_db(CSRS_DB)
+        csrs_db[csr_id] = {
+            'id': csr_id,
+            'key_id': key_id,
+            'subject': subject_data,
+            'purpose': key_purpose,
+            'created_at': datetime.now().isoformat(),
+            'csr_file': csr_file,
+            'signed': False
+        }
+        save_json_db(CSRS_DB, csrs_db)
+
+        # 3. Sign Certificate
+        cas_db = load_json_db(CAS_DB)
+        if ca_id not in cas_db:
+            return jsonify({'success': False, 'error': 'CA not found'}), 404
+        ca_info = cas_db[ca_id]
+        with open(ca_info['cert_file'], 'rb') as f:
+            ca_cert = x509.load_pem_x509_certificate(f.read())
+        with open(ca_info['key_file'], 'rb') as f:
+            ca_private_key = serialization.load_pem_private_key(f.read(), password=None)
+        cert = x509.CertificateBuilder().subject_name(
+            csr.subject
+        ).issuer_name(
+            ca_cert.subject
+        ).public_key(
+            csr.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.utcnow()
+        ).not_valid_after(
+            datetime.utcnow() + timedelta(days=validity_days)
+        )
+        for extension in csr.extensions:
+            cert = cert.add_extension(extension.value, critical=extension.critical)
+        cert = cert.sign(ca_private_key, hashes.SHA256())
+        cert_id = str(uuid.uuid4())
+        cert_file = os.path.join(CERTS_DIR, f"{cert_id}.pem")
+        with open(cert_file, 'wb') as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+        certs_db = load_json_db(CERTS_DB)
+        certs_db[cert_id] = {
+            'id': cert_id,
+            'csr_id': csr_id,
+            'ca_id': ca_id,
+            'subject': subject_data,
+            'serial_number': str(cert.serial_number),
+            'not_valid_before': cert.not_valid_before.isoformat(),
+            'not_valid_after': cert.not_valid_after.isoformat(),
+            'purpose': key_purpose,
+            'created_at': datetime.now().isoformat(),
+            'cert_file': cert_file
+        }
+        save_json_db(CERTS_DB, certs_db)
+        csrs_db[csr_id]['signed'] = True
+        csrs_db[csr_id]['cert_id'] = cert_id
+        save_json_db(CSRS_DB, csrs_db)
+
+        return jsonify({
+            'success': True,
+            'cert_id': cert_id,
+            'key_id': key_id,
+            'csr_id': csr_id,
+            'serial_number': certs_db[cert_id]['serial_number'],
+            'not_valid_after': certs_db[cert_id]['not_valid_after']
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
