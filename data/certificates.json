@@ -1,0 +1,21 @@
+{
+  "8f4ca9ce-596b-4dab-8a4c-c7e9e0f54943": {
+    "id": "8f4ca9ce-596b-4dab-8a4c-c7e9e0f54943",
+    "csr_id": "fb2d386f-5bfa-469c-a7ac-8377fb62969a",
+    "ca_id": "b89060be-78ff-4d72-a938-6d94aee7f967",
+    "subject": {
+      "common_name": "Rafael Evaristo",
+      "organization": "",
+      "organizational_unit": "",
+      "country": "",
+      "state": "",
+      "city": ""
+    },
+    "serial_number": "98727812188246069839699231493752966353244782656",
+    "not_valid_before": "2025-07-06T17:40:58",
+    "not_valid_after": "2026-07-06T17:40:58",
+    "purpose": "smime",
+    "created_at": "2025-07-06T18:40:58.120766",
+    "cert_file": "data/certificates/8f4ca9ce-596b-4dab-8a4c-c7e9e0f54943.pem"
+  }
+}

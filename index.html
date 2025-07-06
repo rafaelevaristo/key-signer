@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate Management System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .hidden { display: none; }
+        .active-tab { background-color: #3B82F6; color: white; }
+        .tab-button { 
+            background-color: #E5E7EB; 
+            color: #374151; 
+            padding: 0.5rem 1rem; 
+            border: none; 
+            cursor: pointer; 
+            border-radius: 0.375rem 0.375rem 0 0;
+            margin-right: 0.25rem;
+        }
+        .tab-button:hover { background-color: #D1D5DB; }
+        .card { 
+            background: white; 
+            border-radius: 0.5rem; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+            padding: 1.5rem; 
+            margin-bottom: 1rem;
+        }
+        .success { color: #10B981; }
+        .error { color: #EF4444; }
+        .form-group { margin-bottom: 1rem; }
+        .form-label { 
+            display: block; 
+            margin-bottom: 0.5rem; 
+            font-weight: 500; 
+            color: #374151;
+        }
+        .form-input { 
+            width: 100%; 
+            padding: 0.5rem; 
+            border: 1px solid #D1D5DB; 
+            border-radius: 0.375rem; 
+            font-size: 0.875rem;
+        }
+        .form-input:focus { 
+            outline: none; 
+            border-color: #3B82F6; 
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .btn { 
+            padding: 0.5rem 1rem; 
+            border: none; 
+            border-radius: 0.375rem; 
+            cursor: pointer; 
+            font-size: 0.875rem; 
+            font-weight: 500;
+        }
+        .btn-primary { 
+            background-color: #3B82F6; 
+            color: white; 
+        }
+        .btn-primary:hover { background-color: #2563EB; }
+        .btn-secondary { 
+            background-color: #6B7280; 
+            color: white; 
+        }
+        .btn-secondary:hover { background-color: #4B5563; }
+        .btn-success { 
+            background-color: #10B981; 
+            color: white; 
+        }
+        .btn-success:hover { background-color: #059669; }
+        .btn-sm { 
+            padding: 0.25rem 0.5rem; 
+            font-size: 0.75rem; 
+        }
+        .table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+        .table th, .table td { 
+            padding: 0.75rem; 
+            text-align: left; 
+            border-bottom: 1px solid #E5E7EB; 
+        }
+        .table th { 
+            background-color: #F9FAFB; 
+            font-weight: 500; 
+            color: #374151;
+        }
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        .status-active { background-color: #D1FAE5; color: #065F46; }
+        .status-pending { background-color: #FEF3C7; color: #92400E; }
+        .status-signed { background-color: #DBEAFE; color: #1E40AF; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-white shadow-sm border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <h1 class="text-xl font-semibold text-gray-900">🔐 Certificate Management</h1>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Tabs -->
+            <div class="mb-6">
+                <button class="tab-button active-tab" onclick="showTab('keys')">🔑 Key Management</button>
+                <button class="tab-button" onclick="showTab('csrs')">📋 Certificate Requests</button>
+                <button class="tab-button" onclick="showTab('cas')">🏢 Certificate Authorities</button>
+                <button class="tab-button" onclick="showTab('certificates')">📜 Certificates</button>
+            </div>
+
+            <!-- Key Management Tab -->
+            <div id="keys-tab" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Generate Key Form -->
+                    <div class="card">
+                        <h2 class="text-lg font-semibold mb-4">Generate New Key Pair</h2>
+                        <form id="key-form">
+                            <div class="form-group">
+                                <label class="form-label">Purpose</label>
+                                <select id="key-purpose" class="form-input">
+                                    <option value="server_auth">Server Authentication (HTTPS/TLS)</option>
+                                    <option value="client_auth">Client Authentication (mTLS)</option>
+                                    <option value="smime">S/MIME (Email)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Key Size</label>
+                                <select id="key-size" class="form-input">
+                                    <option value="2048">2048 bits</option>
+                                    <option value="3072">3072 bits</option>
+                                    <option value="4096">4096 bits</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Generate Key Pair</button>
+                        </form>
+                        <div id="key-result" class="mt-4"></div>
+                    </div>
+
+                    <!-- Keys List -->
+                    <div class="card">
+                        <h2 class="text-lg font-semibold mb-4">Generated Keys</h2>
+                        <div id="keys-list">
+                            <p class="text-gray-500">No keys generated yet.</p>
+                        </div>
+                        <button onclick="loadKeys()" class="btn btn-secondary btn-sm mt-4">Refresh</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CSRs Tab -->
+            <div id="csrs-tab" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Create CSR Form -->
+                    <div class="card">
+                        <h2 class="text-lg font-semibold mb-4">Create Certificate Request</h2>
+                        <form id="csr-form">
+                            <div class="form-group">
+                                <label class="form-label">Select Key</label>
+                                <select id="csr-key" class="form-input">
+                                    <option value="">Select a key...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Common Name (CN)</label>
+                                <input type="text" id="csr-cn" class="form-input" placeholder="example.com">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Organization (O)</label>
+                                <input type="text" id="csr-org" class="form-input" placeholder="My Company">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Organizational Unit (OU)</label>
+                                <input type="text" id="csr-ou" class="form-input" placeholder="IT Department">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Country (C)</label>
+                                <input type="text" id="csr-country" class="form-input" maxlength="2" placeholder="US">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">State/Province (ST)</label>
+                                <input type="text" id="csr-state" class="form-input" placeholder="California">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">City/Locality (L)</label>
+                                <input type="text" id="csr-city" class="form-input" placeholder="San Francisco">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Create CSR</button>
+                        </form>
+                        <div id="csr-result" class="mt-4"></div>
+                    </div>
+
+                    <!-- CSRs List -->
+                    <div class="card">
+                        <h2 class="text-lg font-semibold mb-4">Certificate Requests</h2>
+                        <div id="csrs-list">
+                            <p class="text-gray-500">No CSRs created yet.</p>
+                        </div>
+                        <button onclick="loadCSRs()" class="btn btn-secondary btn-sm mt-4">Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Sign CSR Section -->
+                <div class="card mt-6">
+                    <h2 class="text-lg font-semibold mb-4">Sign Certificate Request</h2>
+                    <form id="sign-form">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="form-group">
+                                <label class="form-label">Select CSR</label>
+                                <select id="sign-csr" class="form-input">
+                                    <option value="">Select a CSR...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Select CA</label>
+                                <select id="sign-ca" class="form-input">
+                                    <option value="">Select a CA...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Validity (Days)</label>
+                                <input type="number" id="sign-validity" class="form-input" value="365">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success">Sign Certificate</button>
+                    </form>
+                    <div id="sign-result" class="mt-4"></div>
+                </div>
+            </div>
+
+            <!-- CAs Tab -->
+            <div id="cas-tab" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Create CA Form -->
+                    <div class="card">
+                        <h2 class="text-lg font-semibold mb-4">Create Certificate Authority</h2>
+                        <form id="ca-form">
+                            <div class="form-group">
+                                <label class="form-label">Common Name (CN)</label>
+                                <input type="text" id="ca-cn" class="form-input" placeholder="My Root CA">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Organization (O)</label>
+                                <input type="text" id="ca-org" class="form-input" placeholder="My Company">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Organizational Unit (OU)</label>
+                                <input type="text" id="ca-ou" class="form-input" placeholder="Certificate Authority">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Country (C)</label>
+                                <input type="text" id="ca-country" class="form-input" maxlength="2" placeholder="US">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">State/Province (ST)</label>
+                                <input type="text" id="ca-state" class="form-input" placeholder="California">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">City/Locality (L)</label>
+                                <input type="text" id="ca-city" class="form-input" placeholder="San Francisco">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Validity (Days)</label>
+                                <input type="number" id="ca-validity" class="form-input" value="3650">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Key Size</label>
+                                <select id="ca-key-size" class="form-input">
+                                    <option value="2048">2048 bits</option>
+                                    <option value="3072">3072 bits</option>
+                                    <option value="4096">4096 bits</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Create CA</button>
+                        </form>
+                        <div id="ca-result" class="mt-4"></div>
+                    </div>
+
+                    <!-- CAs List -->
+                    <div class="card">
+                        <h2 class="text-lg font-semibold mb-4">Certificate Authorities</h2>
+                        <div id="cas-list">
+                            <p class="text-gray-500">No CAs created yet.</p>
+                        </div>
+                        <button onclick="loadCAs()" class="btn btn-secondary btn-sm mt-4">Refresh</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Certificates Tab -->
+            <div id="certificates-tab" class="tab-content hidden">
+                <div class="card">
+                    <h2 class="text-lg font-semibold mb-4">Issued Certificates</h2>
+                    <div id="certificates-list">
+                        <p class="text-gray-500">No certificates issued yet.</p>
+                    </div>
+                    <button onclick="loadCertificates()" class="btn btn-secondary btn-sm mt-4">Refresh</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        // Tab management
+        function showTab(tabName) {
+            // Hide all tabs
+            const tabs = document.querySelectorAll('.tab-content');
+            tabs.forEach(tab => tab.classList.add('hidden'));
+            
+            // Remove active class from all tab buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(btn => btn.classList.remove('active-tab'));
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.remove('hidden');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active-tab');
+            
+            // Load data for the selected tab
+            switch(tabName) {
+                case 'keys':
+                    loadKeys();
+                    break;
+                case 'csrs':
+                    loadCSRs();
+                    loadKeys(); // For CSR form dropdown
+                    loadCAs(); // For signing form dropdown
+                    break;
+                case 'cas':
+                    loadCAs();
+                    break;
+                case 'certificates':
+                    loadCertificates();
+                    break;
+            }
+        }
+
+        // Utility functions
+        function showResult(elementId, message, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${isSuccess ? 'success' : 'error'}">${message}</div>`;
+            setTimeout(() => element.innerHTML = '', 5000);
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString();
+        }
+
+        function downloadFile(url, filename) {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // Key management
+        document.getElementById('key-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const purpose = document.getElementById('key-purpose').value;
+            const keySize = document.getElementById('key-size').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/generate-key`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ purpose, key_size: keySize })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('key-result', `Key pair generated successfully! Key ID: ${result.key_id}`);
+                    loadKeys();
+                } else {
+                    showResult('key-result', `Error: ${result.error}`, false);
+                }
+            } catch (error) {
+                showResult('key-result', `Error: ${error.message}`, false);
+            }
+        });
+
+        async function loadKeys() {
+            try {
+                const response = await fetch(`${API_BASE}/keys`);
+                const keys = await response.json();
+                
+                const keysList = document.getElementById('keys-list');
+                const csrKeySelect = document.getElementById('csr-key');
+                
+                if (keys.length === 0) {
+                    keysList.innerHTML = '<p class="text-gray-500">No keys generated yet.</p>';
+                    csrKeySelect.innerHTML = '<option value="">Select a key...</option>';
+                    return;
+                }
+                
+                keysList.innerHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Purpose</th>
+                                <th>Key Size</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${keys.map(key => `
+                                <tr>
+                                    <td>${key.purpose}</td>
+                                    <td>${key.key_size} bits</td>
+                                    <td>${formatDate(key.created_at)}</td>
+                                    <td>
+                                        <button onclick="downloadFile('${API_BASE}/download/key/${key.id}/public', '${key.id}_public.pem')" class="btn btn-sm btn-secondary">Public Key</button>
+                                        <button onclick="downloadFile('${API_BASE}/download/key/${key.id}/private', '${key.id}_private.pem')" class="btn btn-sm btn-secondary">Private Key</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                // Update CSR key dropdown
+                csrKeySelect.innerHTML = '<option value="">Select a key...</option>' + 
+                    keys.map(key => `<option value="${key.id}">${key.purpose} (${key.key_size} bits)</option>`).join('');
+                
+            } catch (error) {
+                console.error('Error loading keys:', error);
+            }
+        }
+
+        // CSR management
+        document.getElementById('csr-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const keyId = document.getElementById('csr-key').value;
+            const subject = {
+                common_name: document.getElementById('csr-cn').value,
+                organization: document.getElementById('csr-org').value,
+                organizational_unit: document.getElementById('csr-ou').value,
+                country: document.getElementById('csr-country').value,
+                state: document.getElementById('csr-state').value,
+                city: document.getElementById('csr-city').value
+            };
+            
+            if (!keyId) {
+                showResult('csr-result', 'Please select a key', false);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/create-csr`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key_id: keyId, subject })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('csr-result', `CSR created successfully! CSR ID: ${result.csr_id}`);
+                    loadCSRs();
+                    document.getElementById('csr-form').reset();
+                } else {
+                    showResult('csr-result', `Error: ${result.error}`, false);
+                }
+            } catch (error) {
+                showResult('csr-result', `Error: ${error.message}`, false);
+            }
+        });
+
+        async function loadCSRs() {
+            try {
+                const response = await fetch(`${API_BASE}/csrs`);
+                const csrs = await response.json();
+                
+                const csrsList = document.getElementById('csrs-list');
+                const signCsrSelect = document.getElementById('sign-csr');
+                
+                if (csrs.length === 0) {
+                    csrsList.innerHTML = '<p class="text-gray-500">No CSRs created yet.</p>';
+                    signCsrSelect.innerHTML = '<option value="">Select a CSR...</option>';
+                    return;
+                }
+                
+                csrsList.innerHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Common Name</th>
+                                <th>Purpose</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${csrs.map(csr => `
+                                <tr>
+                                    <td>${csr.subject.common_name || 'N/A'}</td>
+                                    <td>${csr.purpose}</td>
+                                    <td><span class="status-badge ${csr.signed ? 'status-signed' : 'status-pending'}">${csr.signed ? 'Signed' : 'Pending'}</span></td>
+                                    <td>
+                                        <button onclick="downloadFile('${API_BASE}/download/csr/${csr.id}', '${csr.id}.csr')" class="btn btn-sm btn-secondary">Download CSR</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                // Update sign CSR dropdown (only unsigned CSRs)
+                const unsignedCSRs = csrs.filter(csr => !csr.signed);
+                signCsrSelect.innerHTML = '<option value="">Select a CSR...</option>' + 
+                    unsignedCSRs.map(csr => `<option value="${csr.id}">${csr.subject.common_name || 'Unnamed'} (${csr.purpose})</option>`).join('');
+                
+            } catch (error) {
+                console.error('Error loading CSRs:', error);
+            }
+        }
+
+        // CA management
+        document.getElementById('ca-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const subject = {
+                common_name: document.getElementById('ca-cn').value,
+                organization: document.getElementById('ca-org').value,
+                organizational_unit: document.getElementById('ca-ou').value,
+                country: document.getElementById('ca-country').value,
+                state: document.getElementById('ca-state').value,
+                city: document.getElementById('ca-city').value
+            };
+            
+            const validityDays = document.getElementById('ca-validity').value;
+            const keySize = document.getElementById('ca-key-size').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/create-ca`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subject, validity_days: validityDays, key_size: keySize })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('ca-result', `CA created successfully! CA ID: ${result.ca_id}`);
+                    loadCAs();
+                    document.getElementById('ca-form').reset();
+                } else {
+                    showResult('ca-result', `Error: ${result.error}`, false);
+                }
+            } catch (error) {
+                showResult('ca-result', `Error: ${error.message}`, false);
+            }
+        });
+
+        async function loadCAs() {
+            try {
+                const response = await fetch(`${API_BASE}/cas`);
+                const cas = await response.json();
+                
+                const casList = document.getElementById('cas-list');
+                const signCaSelect = document.getElementById('sign-ca');
+                
+                if (cas.length === 0) {
+                    casList.innerHTML = '<p class="text-gray-500">No CAs created yet.</p>';
+                    signCaSelect.innerHTML = '<option value="">Select a CA...</option>';
+                    return;
+                }
+                
+                casList.innerHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Common Name</th>
+                                <th>Serial Number</th>
+                                <th>Expires</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${cas.map(ca => `
+                                <tr>
+                                    <td>${ca.subject.common_name || 'N/A'}</td>
+                                    <td>${ca.serial_number.substring(0, 16)}...</td>
+                                    <td>${formatDate(ca.not_valid_after)}</td>
+                                    <td>
+                                        <button onclick="downloadFile('${API_BASE}/download/ca/${ca.id}/cert', 'ca_${ca.id}.pem')" class="btn btn-sm btn-secondary">Certificate</button>
+                                        <button onclick="downloadFile('${API_BASE}/download/ca/${ca.id}/key', 'ca_${ca.id}_key.pem')" class="btn btn-sm btn-secondary">Private Key</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                // Update sign CA dropdown
+                signCaSelect.innerHTML = '<option value="">Select a CA...</option>' + 
+                    cas.map(ca => `<option value="${ca.id}">${ca.subject.common_name || 'Unnamed CA'}</option>`).join('');
+                
+            } catch (error) {
+                console.error('Error loading CAs:', error);
+            }
+        }
+
+        // Certificate signing
+        document.getElementById('sign-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const csrId = document.getElementById('sign-csr').value;
+            const caId = document.getElementById('sign-ca').value;
+            const validityDays = document.getElementById('sign-validity').value;
+            
+            if (!csrId || !caId) {
+                showResult('sign-result', 'Please select both CSR and CA', false);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/sign-csr`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ csr_id: csrId, ca_id: caId, validity_days: validityDays })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('sign-result', `Certificate signed successfully! Certificate ID: ${result.cert_id}`);
+                    loadCSRs();
+                    loadCertificates();
+                    document.getElementById('sign-form').reset();
+                } else {
+                    showResult('sign-result', `Error: ${result.error}`, false);
+                }
+            } catch (error) {
+                showResult('sign-result', `Error: ${error.message}`, false);
+            }
+        });
+
+        // Certificate management
+        async function loadCertificates() {
+            try {
+                const response = await fetch(`${API_BASE}/certificates`);
+                const certificates = await response.json();
+                
+                const certsList = document.getElementById('certificates-list');
+                
+                if (certificates.length === 0) {
+                    certsList.innerHTML = '<p class="text-gray-500">No certificates issued yet.</p>';
+                    return;
+                }
+                
+                certsList.innerHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Common Name</th>
+                                <th>Purpose</th>
+                                <th>Serial Number</th>
+                                <th>Expires</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${certificates.map(cert => `
+                                <tr>
+                                    <td>${cert.subject.common_name || 'N/A'}</td>
+                                    <td>${cert.purpose}</td>
+                                    <td>${cert.serial_number.substring(0, 16)}...</td>
+                                    <td>${formatDate(cert.not_valid_after)}</td>
+                                    <td>
+                                        <button onclick="downloadFile('${API_BASE}/download/certificate/${cert.id}', 'cert_${cert.id}.pem')" class="btn btn-sm btn-success">Download Certificate</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+            } catch (error) {
+                console.error('Error loading certificates:', error);
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load initial data
+            loadKeys();
+        });
+    </script>
+</body>
+</html>

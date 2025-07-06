@@ -1,0 +1,21 @@
+{
+  "b89060be-78ff-4d72-a938-6d94aee7f967": {
+    "id": "b89060be-78ff-4d72-a938-6d94aee7f967",
+    "subject": {
+      "common_name": "testing CA",
+      "organization": "",
+      "organizational_unit": "",
+      "country": "",
+      "state": "",
+      "city": ""
+    },
+    "serial_number": "235996411196083266291182128659159257937000921980",
+    "not_valid_before": "2025-07-06T17:39:40",
+    "not_valid_after": "2035-07-04T17:39:40",
+    "key_size": 2048,
+    "created_at": "2025-07-06T18:39:40.918979",
+    "cert_file": "data/cas/b89060be-78ff-4d72-a938-6d94aee7f967_cert.pem",
+    "key_file": "data/cas/b89060be-78ff-4d72-a938-6d94aee7f967_key.pem",
+    "type": "created"
+  }
+}
