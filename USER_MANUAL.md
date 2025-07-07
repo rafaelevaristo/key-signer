@@ -83,7 +83,23 @@ Before you can issue any certificates, you need a trusted entity to sign them. I
     *   **Key Size:** The strength of your CA's private key. Larger sizes (e.g., 4096 bits) offer more security.
 3.  Click **"Create CA"**.
 
+**Equivalent OpenSSL Commands:**
+
+First, generate the CA's private key:
+```bash
+openssl genrsa -aes256 -out ca.key 4096
+```
+(You will be prompted to enter a passphrase for the key.)
+
+Then, create the self-signed CA certificate:
+```bash
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt \
+    -subj "/C=US/ST=California/L=San Francisco/O=My Company/OU=Certificate Authority/CN=My Company Root CA/emailAddress=ca@example.com"
+```
+(Adjust `-days` for validity and `-subj` for your CA's details.)
+
 **Why this step?** A CA is the root of trust. Any certificate signed by this CA will be trusted by systems that trust this CA. For S/MIME, if recipients trust your CA, they will trust the S/MIME certificates you issue.
+
 
 ### Step 3.2: Generate a Key Pair (for S/MIME)
 
@@ -95,6 +111,14 @@ Every S/MIME certificate needs a unique public/private key pair.
     *   **Key Size:** Choose a strong key size (e.g., 2048 or 4096 bits).
     *   **Key Name (Optional):** Give your key a descriptive name (e.g., `John Doe S/MIME Key`). This helps you identify it later.
 3.  Click **"Generate Key Pair"**.
+
+**Equivalent OpenSSL Commands:**
+
+Generate a new RSA private key:
+```bash
+openssl genrsa -out user.key 2048
+```
+(Replace `2048` with your desired key size, e.g., `4096`.)
 
 **Why this step?** This generates the cryptographic foundation for your S/MIME certificate. The private key will be used to sign your emails and decrypt incoming encrypted emails, while the public key will be embedded in your certificate for others to use.
 
@@ -110,7 +134,17 @@ Now you'll create a request to have your public key certified by your CA.
     *   **Email (for S/MIME):** **Crucially, enter the email address for which this S/MIME certificate is intended.** This email address will be embedded in the certificate and is essential for S/MIME functionality.
 3.  Click **"Create CSR"**.
 
+**Equivalent OpenSSL Commands:**
+
+Create a CSR using the private key generated in the previous step:
+```bash
+openssl req -new -key user.key -out user.csr \
+    -subj "/C=US/ST=California/L=San Francisco/O=My Company/OU=IT/CN=John Doe/emailAddress=john.doe@example.com"
+```
+(Adjust `-subj` for your details. Ensure the `emailAddress` matches the S/MIME email.)
+
 **Why this step?** The CSR bundles your public key with your identity information (including your email address for S/MIME). This is what you present to the CA for signing. The CA will verify this information before issuing the certificate.
+
 
 ### Step 3.4: Sign the CSR with your CA
 
@@ -123,7 +157,17 @@ This is where your CA vouches for your identity and public key.
     *   **Validity (Days):** How long the S/MIME certificate will be valid.
 3.  Click **"Sign Certificate"**.
 
+**Equivalent OpenSSL Commands:**
+
+Sign the CSR using your CA's private key and certificate:
+```bash
+openssl x509 -req -in user.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out user.crt -days 365 -sha256 \
+    -extfile <(printf "subjectAltName=email:copy")
+```
+(Replace `365` with your desired validity days. The `-extfile` part ensures the email from the CSR is copied to the certificate's Subject Alternative Name extension, which is crucial for S/MIME.)
+
 **Why this step?** When the CA signs your CSR, it creates your digital certificate. The CA's digital signature on your certificate means that anyone who trusts that CA can now trust that your public key genuinely belongs to you and the email address specified.
+
 
 ### Step 3.5: Download the PFX/PKCS#12 File
 
@@ -133,6 +177,14 @@ To use your S/MIME certificate in an email client, you need both your certificat
 2.  Locate the certificate you just signed (it will have the Common Name and Purpose you specified).
 3.  Click the **"Download PFX"** button next to your certificate.
 4.  You will be prompted to **"Enter a password for the PFX file (optional):"**. It is highly recommended to set a strong password for your PFX file, as it contains your private key. This password will be required when you import the PFX file into your email client.
+
+**Equivalent OpenSSL Commands:**
+
+Combine the private key and certificate into a PFX file:
+```bash
+openssl pkcs12 -export -out user.pfx -inkey user.key -in user.crt -name "John Doe S/MIME Certificate"
+```
+(You will be prompted to set an export password for the PFX file. This password protects the private key within the PFX.)
 
 **Why this step?** Email clients (like Outlook, Thunderbird, Apple Mail) typically require both your certificate and your private key to enable S/MIME. The PFX/PKCS#12 format is the standard way to package these together securely. The password protects your private key within the PFX file.
 
